@@ -1,4 +1,4 @@
-# 💧 Smart Health Assistant
+# Smart Health Assistant
 
 ### AI + Rule-Based Water-Borne Disease Detection System
 
@@ -185,4 +185,3 @@ Always consult a qualified healthcare provider.
 Developed by **Akshita Bhardwaj**
 
 ---
-Give it a ⭐ on GitHub!
