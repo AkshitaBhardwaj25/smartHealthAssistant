@@ -8,7 +8,7 @@ from backend_code import (
     retrieveFormDataFromDatabase,
     backfill_final_disease,
     delete_all_records,
-    check_disease_rules,              
+    check_disease_rules,
     extract_symptoms_from_text,
     extract_name_and_symptoms
 )
@@ -35,14 +35,10 @@ AI + Rule-based Water-borne Disease Detection
 
 st.markdown("""
 <style>
-
-/* DARK MODE BACKGROUND */
 .stApp {
     background: linear-gradient(135deg, #0f172a, #1e293b);
     color: white;
 }
-
-/* INPUT FIELDS */
 .stTextInput>div>div>input,
 .stTextArea textarea {
     background-color: #1e293b;
@@ -50,29 +46,21 @@ st.markdown("""
     border-radius: 10px;
     border: 1px solid #38bdf8;
 }
-
-/* BUTTON */
 .stButton>button {
     background-color: #38bdf8;
     color: black;
     border-radius: 10px;
     font-weight: bold;
 }
-
-/* HEADINGS */
-h1, h2, h3 {
-    color: #38bdf8;
-}
-
-/* CHAT BUBBLE */
+h1, h2, h3 { color: #38bdf8; }
 div[data-testid="stChatMessage"] {
     background-color: #1e293b !important;
     border-radius: 10px;
     padding: 10px;
 }
-
 </style>
 """, unsafe_allow_html=True)
+
 # ------------------------------
 # Mode Selection
 # ------------------------------
@@ -97,22 +85,21 @@ if mode == "Disease Form":
                 try:
                     interpreted_command = interpret_command_with_gpt(prompt)
                     response = process_interpreted_command(interpreted_command)
-
                 except Exception as e:
+                    # Hard fallback: rule-based only
                     symptoms_list = extract_symptoms_from_text(symptoms)
                     matched = check_disease_rules(symptoms_list)
-
-                    if matched:
-                        response = f"You may have: {', '.join(matched)}"
-                    else:
-                        response = "Could not detect disease. Please consult a doctor."
-
-                    print("FALLBACK ERROR:", str(e))
+                    response = (
+                        f"You may have: {', '.join(matched)}"
+                        if matched
+                        else "Could not detect disease. Please consult a doctor."
+                    )
+                    st.warning(f"AI unavailable, using rule-based fallback. ({e})")
 
                 st.markdown(f"""
                     <div style='
-                        padding:15px; 
-                        border-radius:12px; 
+                        padding:15px;
+                        border-radius:12px;
                         background:linear-gradient(135deg, #1e293b, #0f172a);
                         color:white;
                         border:1px solid #38bdf8;
@@ -132,18 +119,15 @@ elif mode == "Chatbot":
         st.session_state.show_chatbot = True
         st.session_state.messages = []
 
-        response = "Hi there, how can I assist you with your health concerns today?"
-        st.session_state.context += f"Bot: {response}\n"
-
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        greeting = "Hi there! How can I assist you with your health concerns today?"
+        st.session_state.context += f"Bot: {greeting}\n"
+        st.session_state.messages.append({"role": "assistant", "content": greeting})
 
     if st.session_state.show_chatbot:
-        # Display previous messages
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        # Handle new user input
         if prompt := st.chat_input("Type your symptoms or query..."):
             with st.chat_message("user"):
                 st.markdown(prompt)
@@ -152,27 +136,22 @@ elif mode == "Chatbot":
             st.session_state.context += f"User: {prompt}\n"
             st.session_state.context = st.session_state.context[-1000:]
 
-            # AI processing
-            full_prompt = f"Previous chat context: {st.session_state.context}\n\nCurrent message: {prompt}"
-
+            # Pass only the current message to Gemini for classification.
+            # Context is stored in session state for display but NOT sent to the classifier
+            # (sending the full blob caused Gemini to echo it back as the response).
             try:
-                interpreted_command = interpret_command_with_gpt(full_prompt)
+                interpreted_command = interpret_command_with_gpt(prompt)
                 response = process_interpreted_command(interpreted_command)
-
             except Exception as e:
-                # 🔥 FULL FALLBACK MODE
                 symptoms_list = extract_symptoms_from_text(prompt)
                 matched = check_disease_rules(symptoms_list)
-
-                if matched:
-                    response = f"You may have: {', '.join(matched)}"
-                else:
-                    response = "I'm not sure about the condition. Please consult a doctor."
-
-                print("FALLBACK ERROR:", str(e))
+                response = (
+                    f"You may have: {', '.join(matched)}"
+                    if matched
+                    else "I'm not sure about the condition. Please consult a doctor."
+                )
 
             st.session_state.context += f"Bot: {response}\n"
-
             addDataToDatabase(prompt, response)
             writeAssistantResponse(response)
 
@@ -211,5 +190,5 @@ elif mode == "View Predictions":
                 count = delete_all_records()
                 st.success(f"🗑️ Deleted {count} records.")
 
-    else:
-        st.warning("⚠️ Admin access required")
+    elif admin_pass:
+        st.error("❌ Incorrect password.")
